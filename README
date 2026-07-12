@@ -1,0 +1,5 @@
+@"
+# AI Code Review Assistant
+
+Full-stack app to review code using static analysis + AI.
+"@ | Out-File -Encoding utf8 README.md
