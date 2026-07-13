@@ -1,15 +1,18 @@
-function calculateScore(messages) {
+
+function calculateScore(findings) {
   let score = 100;
 
-  messages.forEach((msg) => {
-    if (msg.severity === 2) {
-      score -= 8; // error → bada deduction
+  findings.forEach((finding) => {
+    if (finding.severity === 'critical') {
+      score -= 10;
+    } else if (finding.severity === 'warning') {
+      score -= 5;
     } else {
-      score -= 3; // warning → chhota deduction
+      score -= 2; // info
     }
   });
 
-  return Math.max(score, 0); // score kabhi negative na ho
+  return Math.max(score, 0);
 }
 
 module.exports = { calculateScore };

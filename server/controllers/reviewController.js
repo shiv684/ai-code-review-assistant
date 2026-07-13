@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { runStaticAnalysis } = require('../services/staticAnalysis');
+const { runAIReview } = require('../services/aiReview');
 const { calculateScore } = require('../utils/scoreCalculator');
 
 exports.analyzeProject = async (req, res) => {
@@ -7,7 +8,6 @@ exports.analyzeProject = async (req, res) => {
   const userId = req.userId;
 
   try {
-    // pehle confirm karo project isi user ka hai (security check)
     const projectResult = await pool.query(
       'SELECT * FROM projects WHERE id = $1 AND user_id = $2',
       [projectId, userId]
@@ -23,45 +23,59 @@ exports.analyzeProject = async (req, res) => {
       return res.status(400).json({ message: 'No source code to analyze' });
     }
 
-    // Stage 1: static analysis chalao
-    const messages = await runStaticAnalysis(project.source_code);
-    const score = calculateScore(messages);
+    // Stage 1: static analysis
+    const staticMessages = await runStaticAnalysis(project.source_code);
 
-    // review record banao
+    // Stage 2: AI review
+    const aiFindings = await runAIReview(
+      project.source_code,
+      project.language || 'javascript'
+    );
+
+    // dono ko ek common format mein convert karo
+    const staticFindings = staticMessages.map((msg) => ({
+      severity: msg.severity === 2 ? 'critical' : 'warning',
+      issue: msg.ruleId || 'unknown-rule',
+      explanation: msg.message,
+      suggested_fix: getSuggestedFix(msg.ruleId),
+      line_number: msg.line,
+    }));
+
+    const allFindings = [...staticFindings, ...aiFindings];
+    const score = calculateScore(allFindings);
+
     const reviewResult = await pool.query(
       `INSERT INTO reviews (project_id, review_type, overall_score, summary)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [
         projectId,
-        'static',
+        'combined',
         score,
-        `Found ${messages.length} issue(s) via static analysis.`,
+        `Found ${allFindings.length} issue(s): ${staticFindings.length} from static analysis, ${aiFindings.length} from AI review.`,
       ]
     );
 
     const review = reviewResult.rows[0];
 
-    // har issue ko review_findings mein insert karo
-    for (const msg of messages) {
+    for (const finding of allFindings) {
       await pool.query(
         `INSERT INTO review_findings 
          (review_id, severity, issue, explanation, suggested_fix, file_name, line_number)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           review.id,
-          msg.severity === 2 ? 'critical' : 'warning',
-          msg.ruleId || 'unknown-rule',
-          msg.message,
-          getSuggestedFix(msg.ruleId), // helper function niche
+          finding.severity,
+          finding.issue,
+          finding.explanation,
+          finding.suggested_fix,
           project.file_name || 'pasted-code',
-          msg.line,
+          finding.line_number || null,
         ]
       );
     }
 
-    // saari findings wapas fetch karke bhejo response mein
     const findingsResult = await pool.query(
-      'SELECT * FROM review_findings WHERE review_id = $1 ORDER BY line_number',
+      'SELECT * FROM review_findings WHERE review_id = $1 ORDER BY line_number NULLS LAST',
       [review.id]
     );
 
@@ -75,34 +89,7 @@ exports.analyzeProject = async (req, res) => {
   }
 };
 
-// GET past review for a project
-exports.getReview = async (req, res) => {
-  const { projectId } = req.params;
-
-  try {
-    const reviewResult = await pool.query(
-      'SELECT * FROM reviews WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [projectId]
-    );
-
-    if (reviewResult.rows.length === 0) {
-      return res.status(404).json({ message: 'No review found' });
-    }
-
-    const review = reviewResult.rows[0];
-    const findingsResult = await pool.query(
-      'SELECT * FROM review_findings WHERE review_id = $1 ORDER BY line_number',
-      [review.id]
-    );
-
-    res.json({ review, findings: findingsResult.rows });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// chhota helper — kuch common rules ke liye generic suggestion
+// scoreCalculator ko bhi update karna hoga (niche dekho)
 function getSuggestedFix(ruleId) {
   const suggestions = {
     'no-unused-vars': 'Remove the unused variable or use it somewhere in the code.',
@@ -114,3 +101,26 @@ function getSuggestedFix(ruleId) {
   };
   return suggestions[ruleId] || 'Review this issue and refactor accordingly.';
 }
+
+// getReview function same rahega jo pehle tha
+exports.getReview = async (req, res) => {
+  const { projectId } = req.params;
+  try {
+    const reviewResult = await pool.query(
+      'SELECT * FROM reviews WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [projectId]
+    );
+    if (reviewResult.rows.length === 0) {
+      return res.status(404).json({ message: 'No review found' });
+    }
+    const review = reviewResult.rows[0];
+    const findingsResult = await pool.query(
+      'SELECT * FROM review_findings WHERE review_id = $1 ORDER BY line_number NULLS LAST',
+      [review.id]
+    );
+    res.json({ review, findings: findingsResult.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
