@@ -1,6 +1,7 @@
 const pool = require('../db');
 const { runStaticAnalysis } = require('../services/staticAnalysis');
 const { runAIReview } = require('../services/aiReview');
+const { analyzeComplexity } = require('../services/complexityAnalysis');
 const { calculateScore } = require('../utils/scoreCalculator');
 
 exports.analyzeProject = async (req, res) => {
@@ -27,12 +28,11 @@ exports.analyzeProject = async (req, res) => {
     const staticMessages = await runStaticAnalysis(project.source_code);
 
     // Stage 2: AI review
-    const aiFindings = await runAIReview(
-      project.source_code,
-      project.language || 'javascript'
-    );
+    const aiFindings = await runAIReview(project.source_code, project.language || 'javascript');
 
-    // dono ko ek common format mein convert karo
+    // Stage 3: complexity metrics
+    const complexityMetrics = analyzeComplexity(project.source_code);
+
     const staticFindings = staticMessages.map((msg) => ({
       severity: msg.severity === 2 ? 'critical' : 'warning',
       issue: msg.ruleId || 'unknown-rule',
@@ -45,13 +45,14 @@ exports.analyzeProject = async (req, res) => {
     const score = calculateScore(allFindings);
 
     const reviewResult = await pool.query(
-      `INSERT INTO reviews (project_id, review_type, overall_score, summary)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO reviews (project_id, review_type, overall_score, summary, complexity_metrics)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [
         projectId,
         'combined',
         score,
         `Found ${allFindings.length} issue(s): ${staticFindings.length} from static analysis, ${aiFindings.length} from AI review.`,
+        JSON.stringify(complexityMetrics),
       ]
     );
 
@@ -89,20 +90,6 @@ exports.analyzeProject = async (req, res) => {
   }
 };
 
-// scoreCalculator ko bhi update karna hoga (niche dekho)
-function getSuggestedFix(ruleId) {
-  const suggestions = {
-    'no-unused-vars': 'Remove the unused variable or use it somewhere in the code.',
-    'no-undef': 'Make sure the variable is declared before use.',
-    'no-var': 'Replace "var" with "let" or "const".',
-    eqeqeq: 'Use "===" instead of "==" for strict comparison.',
-    semi: 'Add a semicolon at the end of the statement.',
-    quotes: 'Use single quotes for string literals.',
-  };
-  return suggestions[ruleId] || 'Review this issue and refactor accordingly.';
-}
-
-// getReview function same rahega jo pehle tha
 exports.getReview = async (req, res) => {
   const { projectId } = req.params;
   try {
@@ -124,3 +111,15 @@ exports.getReview = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+function getSuggestedFix(ruleId) {
+  const suggestions = {
+    'no-unused-vars': 'Remove the unused variable or use it somewhere in the code.',
+    'no-undef': 'Make sure the variable is declared before use.',
+    'no-var': 'Replace "var" with "let" or "const".',
+    eqeqeq: 'Use "===" instead of "==" for strict comparison.',
+    semi: 'Add a semicolon at the end of the statement.',
+    quotes: 'Use single quotes for string literals.',
+  };
+  return suggestions[ruleId] || 'Review this issue and refactor accordingly.';
+}
