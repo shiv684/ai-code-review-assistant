@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../api/axiosInstance';
 
 export default function NewReview() {
-  const [mode, setMode] = useState('paste'); // 'paste' or 'upload'
+  const [mode, setMode] = useState('paste');
   const [projectName, setProjectName] = useState('');
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState('');
@@ -12,6 +12,20 @@ export default function NewReview() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (mode === 'paste' && !code.trim()) {
+      setMessage('Please paste some code before submitting.');
+      return;
+    }
+    if (mode === 'upload' && !file) {
+      setMessage('Please select a file before submitting.');
+      return;
+    }
+    if (!projectName.trim()) {
+      setMessage('Please enter a project name.');
+      return;
+    }
+
     setLoading(true);
     setMessage('');
 
@@ -26,13 +40,8 @@ export default function NewReview() {
         formData.append('file', file);
       }
 
-      const token = localStorage.getItem('token');
-
-      const res = await axios.post('http://localhost:5000/api/projects', formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
+      const res = await api.post('/projects', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       setMessage('Project submitted successfully!');
@@ -49,7 +58,6 @@ export default function NewReview() {
     <div className="p-6 max-w-2xl">
       <h1 className="text-xl font-semibold mb-4">New Review</h1>
 
-      {/* mode toggle */}
       <div className="flex gap-2 mb-4">
         <button
           className={`px-4 py-2 rounded ${mode === 'paste' ? 'bg-gray-800 text-white' : 'bg-gray-200'}`}

@@ -11,9 +11,12 @@ module.exports = function (req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId; // attach to request for next handler
+    req.userId = decoded.userId;
     next();
   } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Session expired. Please log in again.' });
+    }
+    return res.status(401).json({ message: 'Invalid token' });
   }
 };

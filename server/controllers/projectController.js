@@ -1,16 +1,15 @@
 const pool = require('../db');
 const fs = require('fs');
+const { generateDocumentation } = require('../services/generateDocs');
 
-// CREATE PROJECT (paste code OR uploaded file)
 exports.createProject = async (req, res) => {
   const { project_name, language, source_code } = req.body;
-  const userId = req.userId; // authMiddleware se aata hai
+  const userId = req.userId;
 
   try {
     let finalCode = source_code;
     let fileName = null;
 
-    // agar file upload hui hai (multer se req.file milega)
     if (req.file) {
       finalCode = fs.readFileSync(req.file.path, 'utf-8');
       fileName = req.file.originalname;
@@ -18,6 +17,10 @@ exports.createProject = async (req, res) => {
 
     if (!finalCode || finalCode.trim() === '') {
       return res.status(400).json({ message: 'No code provided' });
+    }
+
+    if (finalCode.length > 50000) {
+      return res.status(400).json({ message: 'Code is too large. Maximum 50,000 characters allowed.' });
     }
 
     const result = await pool.query(
@@ -33,7 +36,6 @@ exports.createProject = async (req, res) => {
   }
 };
 
-// GET ALL PROJECTS FOR LOGGED-IN USER
 exports.getProjects = async (req, res) => {
   try {
     const result = await pool.query(
@@ -46,7 +48,6 @@ exports.getProjects = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-const { generateDocumentation } = require('../services/generateDocs');
 
 exports.generateDocs = async (req, res) => {
   const { projectId } = req.params;
@@ -84,6 +85,7 @@ exports.generateDocs = async (req, res) => {
     res.status(500).json({ message: 'Server error while generating documentation' });
   }
 };
+
 exports.deleteProject = async (req, res) => {
   const { projectId } = req.params;
   const userId = req.userId;
@@ -103,4 +105,4 @@ exports.deleteProject = async (req, res) => {
     console.error(err);
     res.status(500).json({ message: 'Server error while deleting project' });
   }
-}; 
+};
