@@ -43,6 +43,8 @@ export default function Results() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [docs, setDocs] = useState(null);
+  const [generatingDocs, setGeneratingDocs] = useState(false);
 
   useEffect(() => {
     fetchReview();
@@ -59,6 +61,19 @@ export default function Results() {
     }
   };
 
+  const handleGenerateDocs = async () => {
+    setGeneratingDocs(true);
+    try {
+      const res = await api.post(`/projects/${projectId}/generate-docs`);
+      setDocs(res.data.documentation);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to generate documentation.');
+    } finally {
+      setGeneratingDocs(false);
+    }
+  };
+
   if (loading) return <div className="p-6">Loading results...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
@@ -71,7 +86,6 @@ export default function Results() {
         ← Back to Dashboard
       </Link>
 
-      {/* Score summary card */}
       <div className="mt-4 mb-6 bg-white border rounded-lg p-6 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Review Summary</h1>
@@ -88,7 +102,6 @@ export default function Results() {
         </div>
       </div>
 
-      {/* Complexity metrics card */}
       {metrics && !metrics.parseError && (
         <div className="mb-6 bg-white border rounded-lg p-6">
           <h2 className="text-md font-semibold mb-4">Complexity Metrics</h2>
@@ -133,7 +146,6 @@ export default function Results() {
         </div>
       )}
 
-      {/* Findings list */}
       <h2 className="text-md font-semibold mb-3">Findings ({findings.length})</h2>
 
       {findings.length === 0 ? (
@@ -166,6 +178,25 @@ export default function Results() {
           })}
         </div>
       )}
+
+      <div className="mt-6 bg-white border rounded-lg p-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-md font-semibold">Generated Documentation</h2>
+          <button
+            onClick={handleGenerateDocs}
+            disabled={generatingDocs}
+            className="text-sm px-3 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-800 disabled:opacity-50"
+          >
+            {generatingDocs ? 'Generating...' : 'Generate Documentation'}
+          </button>
+        </div>
+
+        {docs && (
+          <pre className="bg-gray-900 text-gray-100 text-xs p-4 rounded overflow-x-auto whitespace-pre-wrap">
+            {docs}
+          </pre>
+        )}
+      </div>
     </div>
   );
 }

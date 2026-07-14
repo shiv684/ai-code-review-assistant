@@ -46,3 +46,41 @@ exports.getProjects = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+const { generateDocumentation } = require('../services/generateDocs');
+
+exports.generateDocs = async (req, res) => {
+  const { projectId } = req.params;
+  const userId = req.userId;
+
+  try {
+    const projectResult = await pool.query(
+      'SELECT * FROM projects WHERE id = $1 AND user_id = $2',
+      [projectId, userId]
+    );
+
+    if (projectResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    const project = projectResult.rows[0];
+
+    if (!project.source_code) {
+      return res.status(400).json({ message: 'No source code to document' });
+    }
+
+    const documentation = await generateDocumentation(
+      project.source_code,
+      project.language || 'javascript'
+    );
+
+    const updateResult = await pool.query(
+      'UPDATE projects SET documentation = $1 WHERE id = $2 RETURNING *',
+      [documentation, projectId]
+    );
+
+    res.json({ documentation: updateResult.rows[0].documentation });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error while generating documentation' });
+  }
+};
