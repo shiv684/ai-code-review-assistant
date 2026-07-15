@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../api/axiosInstance';
+import Spinner from '../components/Spinner';
 
 const severityStyles = {
   critical: {
@@ -74,7 +75,7 @@ export default function Results() {
     }
   };
 
-  if (loading) return <div className="p-6">Loading results...</div>;
+  if (loading) return <Spinner label="Loading results..." />;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
   const { review, findings } = data;

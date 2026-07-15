@@ -116,7 +116,11 @@ export default function NewReview() {
           {loading ? 'Submitting...' : 'Submit for Review'}
         </button>
 
-        {message && <p className="text-sm mt-2">{message}</p>}
+        {message && (
+          <p className={`text-sm mt-2 ${message.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>
+            {message}
+          </p>
+        )}
       </form>
     </div>
   );

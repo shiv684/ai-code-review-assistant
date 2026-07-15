@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axiosInstance';
+import Spinner from '../components/Spinner';
+import Toast from '../components/Toast';
 
 export default function Dashboard() {
   const [projects, setProjects] = useState([]);
@@ -8,6 +10,7 @@ export default function Dashboard() {
   const [analyzingId, setAnalyzingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [languageFilter, setLanguageFilter] = useState('all');
+  const [toast, setToast] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,7 +35,7 @@ export default function Dashboard() {
       navigate(`/results/${projectId}`);
     } catch (err) {
       console.error(err);
-      alert('Analysis failed. Check console for details.');
+      setToast('Analysis failed. Please try again.');
     } finally {
       setAnalyzingId(null);
     }
@@ -47,11 +50,10 @@ export default function Dashboard() {
       setProjects((prev) => prev.filter((p) => p.id !== projectId));
     } catch (err) {
       console.error(err);
-      alert('Failed to delete project.');
+      setToast('Failed to delete project.');
     }
   };
 
-  // derive available languages from existing projects, for the filter dropdown
   const availableLanguages = [...new Set(projects.map((p) => p.language).filter(Boolean))];
 
   const filteredProjects = projects.filter((project) => {
@@ -63,7 +65,7 @@ export default function Dashboard() {
     return matchesSearch && matchesLanguage;
   });
 
-  if (loading) return <div className="p-6">Loading projects...</div>;
+  if (loading) return <Spinner label="Loading projects..." />;
 
   return (
     <div className="p-6">
@@ -77,7 +79,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Search and filter bar */}
       <div className="flex gap-3 mb-4">
         <input
           type="text"
@@ -144,6 +145,8 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      <Toast message={toast} onClose={() => setToast('')} />
     </div>
   );
 }

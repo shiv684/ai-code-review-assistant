@@ -98,3 +98,22 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.updateProfile = async (req, res) => {
+  const { name } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ message: 'Name cannot be empty' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE users SET name = $1 WHERE id = $2 RETURNING id, name, email, created_at',
+      [name.trim(), req.userId]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error while updating profile' });
+  }
+};
