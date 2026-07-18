@@ -1,5 +1,112 @@
-@"
 # AI Code Review Assistant
 
-Full-stack app to review code using static analysis + AI.
-"@ | Out-File -Encoding utf8 README.md
+A full-stack web application that automatically reviews source code using static analysis (ESLint) and AI (Groq/Llama) to help developers catch bugs, security issues, code smells, and performance problems before submitting their work.
+
+## Live Demo
+
+- **Frontend:** https://ai-code-review-assistant-weld-theta.vercel.app
+- **Backend API:** https://ai-code-review-assistant-eeb4.onrender.com
+
+## Features
+
+- User authentication (signup, login, profile management)
+- Code submission via paste or file upload
+- Static code analysis (ESLint) — syntax errors, unused variables, style violations
+- AI-powered code review — bugs, security issues, performance suggestions, best practices
+- Cyclomatic complexity analysis (per-function complexity, lines of code, function/class counts)
+- Auto-generated documentation (JSDoc-style comments)
+- Review history dashboard with search and language filtering
+- Delete reviews/projects
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React (Vite) + Tailwind CSS |
+| Backend | Node.js + Express |
+| Database | PostgreSQL |
+| Authentication | JWT + bcrypt |
+| AI Integration | Groq API (Llama 3.3 70B) |
+| Static Analysis | ESLint |
+| Complexity Analysis | Acorn (AST parser) |
+| File Upload | Multer |
+| Deployment | Vercel (frontend) + Render (backend + database) |
+
+## Project Structure
+
+ai-code-review-assistant/
+├── client/          React frontend
+│   └── src/
+│       ├── pages/       Login, Signup, Dashboard, NewReview, Results, Profile
+│       ├── components/  Sidebar, Spinner, Toast, ProtectedRoute
+│       ├── layouts/     AppLayout
+│       └── api/         Axios instance
+└── server/          Express backend
+├── controllers/     Auth, Project, Review logic
+├── routes/          API route definitions
+├── services/        Static analysis, AI review, complexity analysis, doc generation
+├── middleware/       Auth middleware, file upload
+└── db/              PostgreSQL connection
+
+
+## Database Schema
+
+- **users** — id, name, email, password, created_at
+- **projects** — id, user_id, project_name, language, source_code, file_name, documentation, created_at
+- **reviews** — id, project_id, review_type, overall_score, summary, complexity_metrics, created_at
+- **review_findings** — id, review_id, severity, issue, explanation, suggested_fix, file_name, line_number
+
+## Local Setup
+
+### Prerequisites
+- Node.js
+- PostgreSQL
+
+### Backend
+
+```bash
+cd server
+npm install
+```
+
+Create a `.env` file in `server/`:
+
+PORT=5000
+DATABASE_URL=postgresql://user:password@localhost:5432/code_review_db
+JWT_SECRET=your_secret_key
+JWT_EXPIRES_IN=7d
+GROQ_API_KEY=your_groq_api_key
+CLIENT_URL=http://localhost:5173
+
+Run the schema in your PostgreSQL database (see `Database Schema` above for tables), then:
+
+```bash
+npm run dev
+```
+
+### Frontend
+
+```bash
+cd client
+npm install
+```
+
+Create a `.env` file in `client/`:
+
+```bash
+npm run dev
+```
+
+## How It Works
+
+1. User submits code by pasting it or uploading a file.
+2. The backend runs **static analysis** (ESLint) to catch syntax and style issues.
+3. The same code is sent to an **AI model** (via Groq) for a deeper review — bugs, security, performance, and design feedback.
+4. **Complexity metrics** are calculated by parsing the code into an AST and counting decision points per function.
+5. All findings are combined into a single review with an overall score, stored in the database, and displayed on a dashboard.
+6. Users can also generate AI-written documentation for their code on demand.
+
+## Author
+
+Shiv Pratap Singh — Computer Science, GLA University
+GitHub: [@shiv684](https://github.com/shiv684)
